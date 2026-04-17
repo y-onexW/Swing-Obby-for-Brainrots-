@@ -1,4 +1,3 @@
-local EncodingService = game:GetService("EncodingService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
@@ -8,17 +7,36 @@ local HRP = char:FindFirstChild("HumanoidRootPart")
 local MovementConnection = nil
 local MovementRunning = false
 
+local NoDetectBox = {
+    RightCornerFront = Vector3.new(293.60, -10.02, -73.48),
+    RightCornerBack  = Vector3.new(293.10, -9.82, 37.96),
+    LeftCornerFront  = Vector3.new(-257.40, -10.02, -73.55),
+    LeftCornerBack   = Vector3.new(-256.90, -9.82, 37.96)
+}
+
 local ActiveBrainrots = game.Workspace.ActiveBrainrots
 
 print("Total objects in ActiveBrainrots:", #ActiveBrainrots:GetChildren())
 
 local brainrotModels = {}
 
+local function IsInNoDetect(pos: Vector3): boolean
+    if not NoDetectBox then return false end
+
+    local minX = math.min(NoDetectBox.LeftCornerFront.X, NoDetectBox.RightCornerFront.X)
+    local maxX = math.max(NoDetectBox.LeftCornerFront.X, NoDetectBox.RightCornerFront.X)
+    local minZ = math.min(NoDetectBox.LeftCornerFront.Z, NoDetectBox.RightCornerFront.Z)
+    local maxZ = math.max(NoDetectBox.LeftCornerFront.Z, NoDetectBox.RightCornerFront.Z)
+
+    return pos.X >= minX and pos.X <= maxX and pos.Z >= minZ and pos.Z <= maxZ
+
+end
+
 function FindBrainrots()
     for _, child in ipairs(ActiveBrainrots:GetChildren()) do
         if child.Name == "ServerHitbox" and child:IsA("Model") then
             for _, obj in ipairs(child:GetChildren()) do
-                if obj:IsA("Model") then
+                if obj:IsA("Model") and obj.Name ~= "Attachment" then
                     table.insert(brainrotModels, obj)
                 end
             end
@@ -28,13 +46,23 @@ function FindBrainrots()
     print("Total Brainrots Models Found:", #brainrotModels)
 
     for i, Brainrots in ipairs(brainrotModels) do
-        print(string.format("[%d/%d] %s", i, #brainrotModels, Brainrots.Name))
+        --print(string.format("[%d/%d] %s", i, #brainrotModels, Brainrots.Name))
 
         local BrainrotRoot = Brainrots:FindFirstChild("HumanoidRootPart")
         if not BrainrotRoot then
             BrainrotRoot = Brainrots:FindFirstChildWhichIsA("BasePart")
         end
 
+        local pos = BrainrotRoot.Position
+
+        if IsInNoDetect(pos) then
+
+            continue
+
+        end
+        --Ignore
+
+        --[[
         if BrainrotRoot then
             local ok, pos = pcall(function() return BrainrotRoot.Position end)
             if ok and pos then
@@ -42,6 +70,11 @@ function FindBrainrots()
             end
         end
 
+        --]]
+
+        --Ignore
+
+        --[[
         local Rarity = Brainrots:GetAttribute("Rarity")
         if Rarity then
             print(" Rarity:", Rarity)
@@ -51,6 +84,7 @@ function FindBrainrots()
         if Mutation then
             print(" Mutation:", Mutation)
         end
+        -]]
 
     end
 
@@ -92,6 +126,12 @@ function SmoothLikeButterMovement(targetModel)
     
     local MovementSpeed = 40
 
+    -- FIXED: Safe check for HRP
+    if not HRP then 
+        warn("SmoothLikeButterMovement: HRP is nil!")
+        return 
+    end
+
     local StartPos = HRP.Position
     
     local root = targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChildWhichIsA("BasePart")
@@ -104,6 +144,11 @@ function SmoothLikeButterMovement(targetModel)
 
     MovementConnection = RunService.Heartbeat:Connect(function(dt)  
         if not MovementRunning then return end 
+
+        if not HRP then 
+            StopSmoothLikeButterMovement()
+            return 
+        end
 
         local currentPos = HRP.Position
         local remainingDist = (targetPos - currentPos).Magnitude
@@ -119,12 +164,19 @@ function SmoothLikeButterMovement(targetModel)
         
         local newPos = currentPos:Lerp(targetPos, t * 1.05) 
         
-        -- Fixed line for Matcha
+        local Progress = (StartPos - currentPos).Magnitude / IntialDis
+        local archHeight = 500
+        local ArchFactor = math.sin(Progress * math.pi)
+
+        local linearY = StartPos.Y + (targetPos.Y - StartPos.Y) * Progress
+        local archOffset = archHeight * ArchFactor
+
+        newPos = Vector3.new(newPos.X, linearY + archOffset, newPos.Z)
+
         HRP.CFrame = CFrame.new(newPos.X, newPos.Y, newPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
     end)
 end
 
---Ignore for now
 function GotoBrainrot()
     if #brainrotModels > 0 then
         SmoothLikeButterMovement(brainrotModels[1])
@@ -133,6 +185,8 @@ end
 
 --Ignore for now
 function GotoIslands()
+
+    
 
 end
 
