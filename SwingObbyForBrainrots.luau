@@ -165,7 +165,7 @@ function SmoothLikeButterMovement(targetModel)
         local newPos = currentPos:Lerp(targetPos, t * 1.05) 
         
         local Progress = (StartPos - currentPos).Magnitude / IntialDis
-        local archHeight = 500
+        local archHeight = 10000
         local ArchFactor = math.sin(Progress * math.pi)
 
         local linearY = StartPos.Y + (targetPos.Y - StartPos.Y) * Progress
@@ -177,6 +177,13 @@ function SmoothLikeButterMovement(targetModel)
     end)
 end
 
+--Ignore for now
+function Filthering()
+
+
+
+end
+
 function GotoBrainrot()
     if #brainrotModels > 0 then
         SmoothLikeButterMovement(brainrotModels[1])
@@ -184,11 +191,45 @@ function GotoBrainrot()
 end
 
 --Ignore for now
-function GotoIslands()
+function GotoZones()
 
-    
+    local Zones = {
+	One     = game.Workspace.Zones[1].Position,
+	Two     = game.Workspace.Zones[2].Position,
+	Three   = game.Workspace.Zones[3].Position,
+	Four    = game.Workspace.Zones[4].Position,
+	Five    = game.Workspace.Zones[5].Position,
+	Six     = game.Workspace.Zones[6].Position,
+	Seven   = game.Workspace.Zones[7].Position,
+	Eight   = game.Workspace.Zones[8].Position,
+	Nine    = game.Workspace.Zones[9].Position,
+	Ten     = game.Workspace.Zones[10].Position,
+	Eleven  = game.Workspace.Zones[11].Position,
+	Twelve  = game.Workspace.Zones[12].Position,
+	Thirteen = game.Workspace.Zones[13].Position,
+	Fourteen = game.Workspace.Zones[14].Position,
+	Fifteen  = game.Workspace.Zones[15].Position,
+    }
+
+
 
 end
 
+function GUI()
+    UI.AddTab("SKIBIDI AUTO", function(tab)
+        
+        local left = tab:Section("Auto Farm", "Left")
+        
+        left:Toggle("Auto", "Start Auto", false, function(state)
+            print("Start Auto:", state)
+            GotoBrainrot()
+        end)
+        
+        
+    end)
+    
+    notify("SKIBIDI AUTO Menu Loaded!", "Success", 4)
+end
+
 FindBrainrots()
-GotoBrainrot()
+GUI()
