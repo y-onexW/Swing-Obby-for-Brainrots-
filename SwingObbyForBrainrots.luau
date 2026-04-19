@@ -118,7 +118,8 @@ function SmoothLikeButterMovement(targetModel)
 
     DisableClip()
     
-    local MovementSpeed = 40
+    local MovementSpeed = 50          -- Increased a bit for faster feel
+    local ArchHeight = 1800           -- Slightly lower for less floaty feel (you can tweak)
 
     if not HRP then 
         warn("SmoothLikeButterMovement: HRP is nil!")
@@ -126,16 +127,17 @@ function SmoothLikeButterMovement(targetModel)
     end
 
     local StartPos = HRP.Position
+    local root = targetModel:FindFirstChild("HumanoidRootPart") 
+             or targetModel:FindFirstChildWhichIsA("BasePart")
     
-    local root = targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChildWhichIsA("BasePart")
     local targetPos = (root and root.Position or Vector3.new()) + Vector3.new(0, 10, 0)
 
-    local IntialDis = (targetPos - StartPos).Magnitude
+    local InitialDist = (targetPos - StartPos).Magnitude
     local StartTime = tick()
 
     MovementRunning = true
 
-    MovementConnection = RunService.Heartbeat:Connect(function(dt)  
+    MovementConnection = RunService.RenderStepped:Connect(function(dt)  
         if not MovementRunning then return end 
 
         if not HRP then 
@@ -146,26 +148,26 @@ function SmoothLikeButterMovement(targetModel)
         local currentPos = HRP.Position
         local remainingDist = (targetPos - currentPos).Magnitude
         
-        if remainingDist < 5 then
-            HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z)
+        if remainingDist < 10 then
+            HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
             StopSmoothLikeButterMovement() 
             return
         end
 
         local timePassed = tick() - StartTime
-        local t = math.min(timePassed * (MovementSpeed / IntialDis), 1)
+        local t = math.min(timePassed * (MovementSpeed / InitialDist), 1)
         
-        local newPos = currentPos:Lerp(targetPos, t * 1.05) 
-        
-        local Progress = (StartPos - currentPos).Magnitude / IntialDis
-        local archHeight = 2500
-        local ArchFactor = math.sin(Progress * math.pi)
+        local linearPos = currentPos:Lerp(targetPos, t * 1.08)
+
+        local Progress = (StartPos - currentPos).Magnitude / InitialDist
+        local ArchFactor = math.sin(Progress * math.pi) 
 
         local linearY = StartPos.Y + (targetPos.Y - StartPos.Y) * Progress
-        local archOffset = archHeight * ArchFactor
+        local archOffset = ArchHeight * ArchFactor
 
-        newPos = Vector3.new(newPos.X, linearY + archOffset, newPos.Z)
+        local newPos = Vector3.new(linearPos.X, linearY + archOffset, linearPos.Z)
 
+        -- Apply while preserving rotation
         HRP.CFrame = CFrame.new(newPos.X, newPos.Y, newPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
     end)
 end
