@@ -21,6 +21,8 @@ print("Total objects in ActiveBrainrots:", #ActiveBrainrots:GetChildren())
 local brainrotModels = {}
 local FildteredBrainrot = {}
 
+local AutoEnabled = false
+local SelectedRarities = {}
 
 local function IsInNoDetect(pos: Vector3): boolean
     if not NoDetectBox then return false end
@@ -34,6 +36,9 @@ local function IsInNoDetect(pos: Vector3): boolean
 end
 
 function FindBrainrots()
+    brainrotModels = {}
+    FildteredBrainrot = {}
+
     for _, child in ipairs(ActiveBrainrots:GetChildren()) do
         if child.Name == "ServerHitbox" and child:IsA("Model") then
             for _, obj in ipairs(child:GetChildren()) do
@@ -53,9 +58,7 @@ function FindBrainrots()
         end
 
         if not BrainrotRoot then
-            print("Warning: No root part found for", Brainrots.Name)
             continue
-        
         end
 
         local pos = BrainrotRoot.Position
@@ -66,7 +69,7 @@ function FindBrainrots()
         
         local Rarity = Brainrots:GetAttribute("Rarity")
         
-        if Rarity == "Secret" or Rarity == "Mythical" then
+        if SelectedRarities[Rarity] then
             table.insert(FildteredBrainrot, Brainrots)
         end
     end
@@ -74,16 +77,11 @@ function FindBrainrots()
     print("FINAL FilteredBrainrot")
     print("Total Filtered Rarity Brainrots:", #FildteredBrainrot)
     if #FildteredBrainrot > 0 then
-        
         for i, Brainrots in ipairs(FildteredBrainrot) do
-        
             local rarity = Brainrots:GetAttribute("Rarity") or "Unknown"
             print(string.format("[%d/%d] %s  |  Rarity: %s", i, #FildteredBrainrot, Brainrots.Name, rarity))
-
         end
-
     end
-
 end
 
 function DisableClip()
@@ -148,7 +146,7 @@ function SmoothLikeButterMovement(targetModel)
         local currentPos = HRP.Position
         local remainingDist = (targetPos - currentPos).Magnitude
         
-        if remainingDist < 1 then
+        if remainingDist < 5 then
             HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z)
             StopSmoothLikeButterMovement() 
             return
@@ -160,7 +158,7 @@ function SmoothLikeButterMovement(targetModel)
         local newPos = currentPos:Lerp(targetPos, t * 1.05) 
         
         local Progress = (StartPos - currentPos).Magnitude / IntialDis
-        local archHeight = 5500
+        local archHeight = 2500
         local ArchFactor = math.sin(Progress * math.pi)
 
         local linearY = StartPos.Y + (targetPos.Y - StartPos.Y) * Progress
@@ -212,10 +210,62 @@ function GUI()
         end)
 
         left:Toggle("Auto", "Start Auto", false, function(state)
+            AutoEnabled = state
             print("Auto State:", state)
             if state then
+                FindBrainrots()
                 GotoBrainrot()
             end
+        end)
+
+        left:Text("Rarity Filter")
+        
+        left:Toggle("FilterCommon", "Common", false, function(state)
+            SelectedRarities["Common"] = state
+        end)
+        
+        left:Toggle("FilterUncommon", "Uncommon", false, function(state)
+            SelectedRarities["Uncommon"] = state
+        end)
+        
+        left:Toggle("FilterRare", "Rare", false, function(state)
+            SelectedRarities["Rare"] = state
+        end)
+        
+        left:Toggle("FilterEpic", "Epic", false, function(state)
+            SelectedRarities["Epic"] = state
+        end)
+        
+        left:Toggle("FilterLegendary", "Legendary", false, function(state)
+            SelectedRarities["Legendary"] = state
+        end)
+        
+        left:Toggle("FilterMythical", "Mythical", true, function(state)
+            SelectedRarities["Mythical"] = state
+        end)
+        
+        left:Toggle("FilterSecret", "Secret", true, function(state)
+            SelectedRarities["Secret"] = state
+        end)
+
+        left:Toggle("FilterGod", "God", true, function(state)
+            SelectedRarities["God"] = state
+        end)
+        
+        left:Toggle("FilterOG", "OG", true, function(state)
+            SelectedRarities["OG"] = state
+        end)
+
+        left:Toggle("FilterDivine", "Divine", true, function(state)
+            SelectedRarities["Divine"] = state
+        end)
+
+        left:Toggle("FilterAncient", "Ancient", true, function(state)
+            SelectedRarities["Ancient"] = state
+        end)
+
+        left:Toggle("FilterClassified", "Classified", true, function(state)
+            SelectedRarities["Classified"] = state
         end)
 
         local right = tab:Section("Teleport To Zones", "Right")
