@@ -1,9 +1,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-
-local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HRP = char:WaitForChild("HumanoidRootPart")
+local char = LocalPlayer.Character
+local HRP = char:FindFirstChild("HumanoidRootPart")
 
 local MovementConnection = nil
 local MovementRunning = false
@@ -28,17 +27,6 @@ local SelectedMoveStyle = 0
 local SelectedZoneMoveStyle = 0
 local SelectedZone = 1
 local AutoLoopThread = nil
-
--- Respawn handling
-LocalPlayer.CharacterAdded:Connect(function(newChar)
-    char = newChar
-    HRP = newChar:WaitForChild("HumanoidRootPart")
-    StopSmoothLikeButterMovement()
-    if AutoEnabled then
-        AutoLoopThread = nil
-        StartAutoLoop()
-    end
-end)
 
 local function IsInNoDetect(pos: Vector3): boolean
     local minX = math.min(NoDetectBox.LeftCornerFront.X, NoDetectBox.RightCornerFront.X)
@@ -174,7 +162,7 @@ end
 function InstantTeleport(targetPos)
     repeat
         HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z)
-        task.wait(0.75)
+        task.wait(0.25)
     until (HRP.Position - targetPos).Magnitude < 5
 end
 
@@ -216,7 +204,6 @@ function StartAutoLoop()
             end
 
             for _, target in ipairs(FildteredBrainrot) do
-                if not AutoEnabled then break end
 
                 MoveToTarget(target)
                 WaitForMovementDone()
@@ -379,7 +366,8 @@ function GUI()
         end)
 
         Extra:Toggle("ToggelVip", "Look In Vip Area", false, function(state)
-            -- nothing for now
+
+            
         end)
 
     end)
