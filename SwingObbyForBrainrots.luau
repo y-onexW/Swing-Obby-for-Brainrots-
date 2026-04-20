@@ -1,8 +1,9 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
-local char = LocalPlayer.Character
-local HRP = char:FindFirstChild("HumanoidRootPart")
+
+local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HRP = char:WaitForChild("HumanoidRootPart")
 
 local MovementConnection = nil
 local MovementRunning = false
@@ -23,9 +24,23 @@ local FildteredBrainrot = {}
 
 local AutoEnabled = false
 local SelectedRarities = {}
+local SelectedMoveStyle = 0
+local SelectedZoneMoveStyle = 0
+local SelectedZone = 1
+local AutoLoopThread = nil
+
+-- Respawn handling
+LocalPlayer.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    HRP = newChar:WaitForChild("HumanoidRootPart")
+    StopSmoothLikeButterMovement()
+    if AutoEnabled then
+        AutoLoopThread = nil
+        StartAutoLoop()
+    end
+end)
 
 local function IsInNoDetect(pos: Vector3): boolean
-
     local minX = math.min(NoDetectBox.LeftCornerFront.X, NoDetectBox.RightCornerFront.X)
     local maxX = math.max(NoDetectBox.LeftCornerFront.X, NoDetectBox.RightCornerFront.X)
     local minZ = math.min(NoDetectBox.LeftCornerFront.Z, NoDetectBox.RightCornerFront.Z)
@@ -56,20 +71,21 @@ function FindBrainrots()
             BrainrotRoot = Brainrots:FindFirstChildWhichIsA("BasePart")
         end
 
+        if not BrainrotRoot then continue end
+
         local pos = BrainrotRoot.Position
 
         if IsInNoDetect(pos) then
             continue
         end
-        
+
         local Rarity = Brainrots:GetAttribute("Rarity")
-        
+
         if SelectedRarities[Rarity] then
             table.insert(FildteredBrainrot, Brainrots)
         end
     end
 
-    print("FINAL FilteredBrainrot")
     print("Total Filtered Rarity Brainrots:", #FildteredBrainrot)
     if #FildteredBrainrot > 0 then
         for i, Brainrots in ipairs(FildteredBrainrot) do
@@ -83,7 +99,7 @@ function DisableClip()
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
             pcall(function()
-                part.CanCollide = false  
+                part.CanCollide = false
             end)
         end
     end
@@ -93,7 +109,7 @@ function EnableClip()
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
             pcall(function()
-                part.CanCollide = true  
+                part.CanCollide = true
             end)
         end
     end
@@ -108,17 +124,13 @@ function StopSmoothLikeButterMovement()
     EnableClip()
 end
 
-function SmoothLikeButterMovement(targetModel)
+function SmoothLikeButterMovement(targetPos)
     StopSmoothLikeButterMovement()
     DisableClip()
 
     local MovementSpeed = 5500
-
-    local root = targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChildWhichIsA("BasePart")
-    local targetPos = (root and root.Position or Vector3.new()) + Vector3.new(0, 10, 0)
-
     local ApexY = math.max(4000, HRP.Position.Y + 4000)
-    local phase = 1 
+    local phase = 1
 
     MovementRunning = true
 
@@ -130,7 +142,7 @@ function SmoothLikeButterMovement(targetModel)
 
         if phase == 1 then
             local newY = math.min(currentPos.Y + step, ApexY)
-            HRP.CFrame = CFrame.new(currentPos.X, newY, currentPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+            HRP.CFrame = CFrame.new(currentPos.X, newY, currentPos.Z)
             if newY >= ApexY then
                 phase = 2
             end
@@ -140,53 +152,118 @@ function SmoothLikeButterMovement(targetModel)
             local flatTarget  = Vector3.new(targetPos.X, ApexY, targetPos.Z)
             local dist = (flatTarget - flatCurrent).Magnitude
             if dist <= step then
-                HRP.CFrame = CFrame.new(targetPos.X, ApexY, targetPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+                HRP.CFrame = CFrame.new(targetPos.X, ApexY, targetPos.Z)
                 phase = 3
             else
                 local dir = (flatTarget - flatCurrent).Unit
                 local newPos = flatCurrent + dir * step
-                HRP.CFrame = CFrame.new(newPos.X, ApexY, newPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+                HRP.CFrame = CFrame.new(newPos.X, ApexY, newPos.Z)
             end
 
         elseif phase == 3 then
             local newY = math.max(currentPos.Y - step, targetPos.Y)
-            HRP.CFrame = CFrame.new(targetPos.X, newY, targetPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+            HRP.CFrame = CFrame.new(targetPos.X, newY, targetPos.Z)
             if newY <= targetPos.Y then
-                HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+                HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z)
                 StopSmoothLikeButterMovement()
             end
         end
     end)
 end
 
-function GotoBrainrot()
-    if #FildteredBrainrot > 0 then
-        SmoothLikeButterMovement(FildteredBrainrot[1])
+function InstantTeleport(targetPos)
+    repeat
+        HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z)
+        task.wait(0.75)
+    until (HRP.Position - targetPos).Magnitude < 5
+end
+
+function MoveToTarget(targetModel)
+    local root = targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChildWhichIsA("BasePart")
+    local targetPos = (root and root.Position or Vector3.new()) + Vector3.new(0, 10, 0)
+
+    if SelectedMoveStyle == 0 then
+        InstantTeleport(targetPos)
     else
-        warn("No Brainrots found in with that rarity!")
+        SmoothLikeButterMovement(targetPos)
     end
 end
 
+function MoveToPosition(pos)
+    if SelectedZoneMoveStyle == 0 then
+        InstantTeleport(pos)
+    else
+        SmoothLikeButterMovement(pos)
+    end
+end
+
+function WaitForMovementDone()
+    if SelectedMoveStyle == 1 then
+        repeat task.wait(0.1) until not MovementRunning
+    end
+end
+
+function StartAutoLoop()
+    if AutoLoopThread then return end
+
+    AutoLoopThread = task.spawn(function()
+        while AutoEnabled do
+            FindBrainrots()
+
+            if #FildteredBrainrot == 0 then
+                task.wait(1)
+                continue
+            end
+
+            for _, target in ipairs(FildteredBrainrot) do
+                if not AutoEnabled then break end
+
+                MoveToTarget(target)
+                WaitForMovementDone()
+
+                keypress(0x45)
+                task.wait(3)
+                keyrelease(0x45)
+
+                task.wait(0.3)
+            end
+        end
+
+        AutoLoopThread = nil
+    end)
+end
+
+function StopAutoLoop()
+    AutoEnabled = false
+    AutoLoopThread = nil
+end
+
 local Zones = {
-	One = game.Workspace.Zones[1].Position,
-	Two = game.Workspace.Zones[2].Position,
-	Three = game.Workspace.Zones[3].Position,
-	Four = game.Workspace.Zones[4].Position,
-	Five = game.Workspace.Zones[5].Position,
-	Six = game.Workspace.Zones[6].Position,
-	Seven = game.Workspace.Zones[7].Position,
-	Eight = game.Workspace.Zones[8].Position,
-	Nine = game.Workspace.Zones[9].Position,
-	Ten = game.Workspace.Zones[10].Position,
-	Eleven = game.Workspace.Zones[11].Position,
-	Twelve = game.Workspace.Zones[12].Position,
-	Thirteen = game.Workspace.Zones[13].Position,
-	Fourteen = game.Workspace.Zones[14].Position,
-	Fifteen = game.Workspace.Zones[15].Position,
-    }
+    One = game.Workspace.Zones[1].Position,
+    Two = game.Workspace.Zones[2].Position,
+    Three = game.Workspace.Zones[3].Position,
+    Four = game.Workspace.Zones[4].Position,
+    Five = game.Workspace.Zones[5].Position,
+    Six = game.Workspace.Zones[6].Position,
+    Seven = game.Workspace.Zones[7].Position,
+    Eight = game.Workspace.Zones[8].Position,
+    Nine = game.Workspace.Zones[9].Position,
+    Ten = game.Workspace.Zones[10].Position,
+    Eleven = game.Workspace.Zones[11].Position,
+    Twelve = game.Workspace.Zones[12].Position,
+    Thirteen = game.Workspace.Zones[13].Position,
+    Fourteen = game.Workspace.Zones[14].Position,
+    Fifteen = game.Workspace.Zones[15].Position,
+}
+
+local ZoneOrder = {"One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen"}
 
 function GotoZones()
-    --Ignore for now
+    local zoneName = ZoneOrder[SelectedZone]
+    local pos = Zones[zoneName]
+    if pos then
+        MoveToPosition(pos + Vector3.new(0, 5, 0))
+    end
 end
 
 local AutoClickerEnabled = false
@@ -194,11 +271,11 @@ local clickerThread = nil
 
 local function StartAutoClicker()
     if clickerThread then return end
-    
+
     clickerThread = task.spawn(function()
         while AutoClickerEnabled do
-            mouse1click()          
-            task.wait(0.05)        
+            mouse1click()
+            task.wait(0.05)
         end
     end)
 end
@@ -210,45 +287,48 @@ end
 
 function GUI()
     UI.AddTab("SKIBIDI AUTO", function(tab)
-        
+
         local left = tab:Section("Movement", "Left")
-        
+
         left:Combo("Move", "Movement Style", {"Instant Teleport", "SmoothLikeButter"}, 0, function(selectedIndex)
-            print("Selected Move:", selectedIndex)
+            SelectedMoveStyle = selectedIndex
         end)
 
-        left:Button("Goto Brainrot", function()
-            AutoEnabled = true
-            FindBrainrots()
-            GotoBrainrot()
+        left:Toggle("Auto", "Auto", false, function(state)
+            AutoEnabled = state
+            if state then
+                StartAutoLoop()
+            else
+                StopAutoLoop()
+            end
         end)
 
         left:Text("Rarity Filter")
-        
+
         left:Toggle("FilterCommon", "Common", false, function(state)
             SelectedRarities["Common"] = state
         end)
-        
+
         left:Toggle("FilterUncommon", "Uncommon", false, function(state)
             SelectedRarities["Uncommon"] = state
         end)
-        
+
         left:Toggle("FilterRare", "Rare", false, function(state)
             SelectedRarities["Rare"] = state
         end)
-        
+
         left:Toggle("FilterEpic", "Epic", false, function(state)
             SelectedRarities["Epic"] = state
         end)
-        
+
         left:Toggle("FilterLegendary", "Legendary", false, function(state)
             SelectedRarities["Legendary"] = state
         end)
-        
+
         left:Toggle("FilterMythic", "Mythic", false, function(state)
             SelectedRarities["Mythic"] = state
         end)
-        
+
         left:Toggle("FilterSecret", "Secret", false, function(state)
             SelectedRarities["Secret"] = state
         end)
@@ -256,7 +336,7 @@ function GUI()
         left:Toggle("FilterGod", "God", false, function(state)
             SelectedRarities["God"] = state
         end)
-        
+
         left:Toggle("FilterOG", "OG", false, function(state)
             SelectedRarities["OG"] = state
         end)
@@ -274,24 +354,23 @@ function GUI()
         end)
 
         local right = tab:Section("Teleport To Zones", "Right")
-        
+
         right:Combo("Teleport Mode", "Movement Style", {"Instant Teleport", "SmoothLikeButter"}, 0, function(selectedIndex)
-            print("Teleport Mode:", selectedIndex)
+            SelectedZoneMoveStyle = selectedIndex
         end)
-        
+
         right:Combo("Zone", "Select Zone", {"One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen"}, 0, function(selectedIndex)
-            print("Selected Zone:", selectedIndex)
+            SelectedZone = selectedIndex + 1
         end)
 
         right:Button("Goto Zone", function()
-            --Nothing for now
+            GotoZones()
         end)
 
         local Extra = tab:Section("MISC", "Right")
 
         Extra:Toggle("AutoClicker", "Auto Clicker (To Upgrade)", false, function(state)
             AutoClickerEnabled = state
-            
             if state then
                 StartAutoClicker()
             else
@@ -301,10 +380,6 @@ function GUI()
 
         Extra:Toggle("ToggelVip", "Look In Vip Area", false, function(state)
             -- nothing for now
-        end)
-
-        Extra:Button("Auto Interact", function()
-            
         end)
 
     end)
