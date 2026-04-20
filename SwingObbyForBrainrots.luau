@@ -2,7 +2,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local char = LocalPlayer.Character
-local HRP = char:FindFirstChild("HumanoidRootPart")
+local HRP = char.HumanoidRootPart
 
 local MovementConnection = nil
 local MovementRunning = false
@@ -15,8 +15,6 @@ local NoDetectBox = {
 }
 
 local ActiveBrainrots = game.Workspace.ActiveBrainrots
-
-print("Total objects in ActiveBrainrots:", #ActiveBrainrots:GetChildren())
 
 local brainrotModels = {}
 local FildteredBrainrot = {}
@@ -51,8 +49,6 @@ function FindBrainrots()
         end
     end
 
-    print("Total Brainrots Models Found:", #brainrotModels)
-
     for i, Brainrots in ipairs(brainrotModels) do
         local BrainrotRoot = Brainrots:FindFirstChild("HumanoidRootPart")
         if not BrainrotRoot then
@@ -74,13 +70,6 @@ function FindBrainrots()
         end
     end
 
-    print("Total Filtered Rarity Brainrots:", #FildteredBrainrot)
-    if #FildteredBrainrot > 0 then
-        for i, Brainrots in ipairs(FildteredBrainrot) do
-            local rarity = Brainrots:GetAttribute("Rarity") or "Unknown"
-            print(string.format("[%d/%d] %s  |  Rarity: %s", i, #FildteredBrainrot, Brainrots.Name, rarity))
-        end
-    end
 end
 
 function DisableClip()
@@ -160,10 +149,14 @@ function SmoothLikeButterMovement(targetPos)
 end
 
 function InstantTeleport(targetPos)
-    repeat
+    DisableClip()
+    for i = 1, 8 do
         HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z)
-        task.wait(0.25)
-    until (HRP.Position - targetPos).Magnitude < 5
+        HRP.AssemblyLinearVelocity = Vector3.zero
+        task.wait(0.1)
+        if (HRP.Position - targetPos).Magnitude < 3 then break end
+    end
+    EnableClip()
 end
 
 function MoveToTarget(targetModel)
@@ -272,13 +265,48 @@ local function StopAutoClicker()
     clickerThread = nil
 end
 
+local function ResetGuiState()
+    AutoEnabled = false
+    AutoClickerEnabled = false
+    SelectedRarities = {}
+    SelectedMoveStyle = 0
+    SelectedZoneMoveStyle = 0
+    SelectedZone = 1
+    StopAutoLoop()
+    StopAutoClicker()
+    StopSmoothLikeButterMovement()
+
+    UI.SetValue("Auto", false)
+    UI.SetValue("AutoClicker", false)
+    UI.SetValue("FilterCommon", false)
+    UI.SetValue("FilterUncommon", false)
+    UI.SetValue("FilterRare", false)
+    UI.SetValue("FilterEpic", false)
+    UI.SetValue("FilterLegendary", false)
+    UI.SetValue("FilterMythic", false)
+    UI.SetValue("FilterSecret", false)
+    UI.SetValue("FilterGod", false)
+    UI.SetValue("FilterOG", false)
+    UI.SetValue("FilterDivine", false)
+    UI.SetValue("FilterAncient", false)
+    UI.SetValue("FilterClassified", false)
+    UI.SetValue("Move", 0)
+    UI.SetValue("Teleport Mode", 0)
+    UI.SetValue("Zone", 0)
+end
+
 function GUI()
+    UI.RemoveTab("SKIBIDI AUTO")
     UI.AddTab("SKIBIDI AUTO", function(tab)
 
         local left = tab:Section("Movement", "Left")
 
-        left:Combo("Move", "Movement Style", {"Instant Teleport", "SmoothLikeButter"}, 0, function(selectedIndex)
-            SelectedMoveStyle = selectedIndex
+        left:Combo("Move", "Movement Style", {"Choose Movement Style", "Instant Teleport", "SmoothLikeButter"}, 0, function(selectedIndex)
+            if selectedIndex == 0 then
+                SelectedMoveStyle = 0
+            else
+                SelectedMoveStyle = selectedIndex - 1
+            end
         end)
 
         left:Toggle("Auto", "Auto", false, function(state)
@@ -342,8 +370,12 @@ function GUI()
 
         local right = tab:Section("Teleport To Zones", "Right")
 
-        right:Combo("Teleport Mode", "Movement Style", {"Instant Teleport", "SmoothLikeButter"}, 0, function(selectedIndex)
-            SelectedZoneMoveStyle = selectedIndex
+        right:Combo("Teleport Mode", "Movement Style", {"Choose Movement Style", "Instant Teleport", "SmoothLikeButter"}, 0, function(selectedIndex)
+            if selectedIndex == 0 then
+                SelectedZoneMoveStyle = 0
+            else
+                SelectedZoneMoveStyle = selectedIndex - 1
+            end
         end)
 
         right:Combo("Zone", "Select Zone", {"One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen"}, 0, function(selectedIndex)
@@ -365,15 +397,16 @@ function GUI()
             end
         end)
 
-        Extra:Toggle("ToggelVip", "Look In Vip Area", false, function(state)
-
-            
+        Extra:Button("Refresh GUI", function()
+            ResetGuiState()
+            GUI()
+            notify("GUI Refreshed!", "Success", 3)
         end)
-
     end)
 
     notify("SKIBIDI AUTO Menu Loaded!", "Success", 4)
 end
 
 FindBrainrots()
+ResetGuiState()
 GUI()
