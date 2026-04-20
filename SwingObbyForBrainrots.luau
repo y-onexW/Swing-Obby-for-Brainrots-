@@ -25,7 +25,6 @@ local AutoEnabled = false
 local SelectedRarities = {}
 
 local function IsInNoDetect(pos: Vector3): boolean
-    if not NoDetectBox then return false end
 
     local minX = math.min(NoDetectBox.LeftCornerFront.X, NoDetectBox.RightCornerFront.X)
     local maxX = math.max(NoDetectBox.LeftCornerFront.X, NoDetectBox.RightCornerFront.X)
@@ -55,10 +54,6 @@ function FindBrainrots()
         local BrainrotRoot = Brainrots:FindFirstChild("HumanoidRootPart")
         if not BrainrotRoot then
             BrainrotRoot = Brainrots:FindFirstChildWhichIsA("BasePart")
-        end
-
-        if not BrainrotRoot then
-            continue
         end
 
         local pos = BrainrotRoot.Position
@@ -114,61 +109,53 @@ function StopSmoothLikeButterMovement()
 end
 
 function SmoothLikeButterMovement(targetModel)
-    StopSmoothLikeButterMovement() 
-
+    StopSmoothLikeButterMovement()
     DisableClip()
-    
-    local MovementSpeed = 50          -- Increased a bit for faster feel
-    local ArchHeight = 1800           -- Slightly lower for less floaty feel (you can tweak)
 
-    if not HRP then 
-        warn("SmoothLikeButterMovement: HRP is nil!")
-        return 
-    end
+    local MovementSpeed = 5500
 
-    local StartPos = HRP.Position
-    local root = targetModel:FindFirstChild("HumanoidRootPart") 
-             or targetModel:FindFirstChildWhichIsA("BasePart")
-    
+    local root = targetModel:FindFirstChild("HumanoidRootPart") or targetModel:FindFirstChildWhichIsA("BasePart")
     local targetPos = (root and root.Position or Vector3.new()) + Vector3.new(0, 10, 0)
 
-    local InitialDist = (targetPos - StartPos).Magnitude
-    local StartTime = tick()
+    local ApexY = math.max(4000, HRP.Position.Y + 4000)
+    local phase = 1 
 
     MovementRunning = true
 
-    MovementConnection = RunService.RenderStepped:Connect(function(dt)  
-        if not MovementRunning then return end 
-
-        if not HRP then 
-            StopSmoothLikeButterMovement()
-            return 
-        end
-
+    MovementConnection = RunService.RenderStepped:Connect(function(dt)
         local currentPos = HRP.Position
-        local remainingDist = (targetPos - currentPos).Magnitude
-        
-        if remainingDist < 10 then
-            HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
-            StopSmoothLikeButterMovement() 
-            return
+        local step = MovementSpeed * dt
+
+        HRP.AssemblyLinearVelocity = Vector3.zero
+
+        if phase == 1 then
+            local newY = math.min(currentPos.Y + step, ApexY)
+            HRP.CFrame = CFrame.new(currentPos.X, newY, currentPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+            if newY >= ApexY then
+                phase = 2
+            end
+
+        elseif phase == 2 then
+            local flatCurrent = Vector3.new(currentPos.X, ApexY, currentPos.Z)
+            local flatTarget  = Vector3.new(targetPos.X, ApexY, targetPos.Z)
+            local dist = (flatTarget - flatCurrent).Magnitude
+            if dist <= step then
+                HRP.CFrame = CFrame.new(targetPos.X, ApexY, targetPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+                phase = 3
+            else
+                local dir = (flatTarget - flatCurrent).Unit
+                local newPos = flatCurrent + dir * step
+                HRP.CFrame = CFrame.new(newPos.X, ApexY, newPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+            end
+
+        elseif phase == 3 then
+            local newY = math.max(currentPos.Y - step, targetPos.Y)
+            HRP.CFrame = CFrame.new(targetPos.X, newY, targetPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+            if newY <= targetPos.Y then
+                HRP.CFrame = CFrame.new(targetPos.X, targetPos.Y, targetPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
+                StopSmoothLikeButterMovement()
+            end
         end
-
-        local timePassed = tick() - StartTime
-        local t = math.min(timePassed * (MovementSpeed / InitialDist), 1)
-        
-        local linearPos = currentPos:Lerp(targetPos, t * 1.08)
-
-        local Progress = (StartPos - currentPos).Magnitude / InitialDist
-        local ArchFactor = math.sin(Progress * math.pi) 
-
-        local linearY = StartPos.Y + (targetPos.Y - StartPos.Y) * Progress
-        local archOffset = ArchHeight * ArchFactor
-
-        local newPos = Vector3.new(linearPos.X, linearY + archOffset, linearPos.Z)
-
-        -- Apply while preserving rotation
-        HRP.CFrame = CFrame.new(newPos.X, newPos.Y, newPos.Z) * (HRP.CFrame - HRP.CFrame.Position)
     end)
 end
 
@@ -202,22 +189,38 @@ function GotoZones()
     --Ignore for now
 end
 
+local AutoClickerEnabled = false
+local clickerThread = nil
+
+local function StartAutoClicker()
+    if clickerThread then return end
+    
+    clickerThread = task.spawn(function()
+        while AutoClickerEnabled do
+            mouse1click()          
+            task.wait(0.05)        
+        end
+    end)
+end
+
+local function StopAutoClicker()
+    AutoClickerEnabled = false
+    clickerThread = nil
+end
+
 function GUI()
     UI.AddTab("SKIBIDI AUTO", function(tab)
         
-        local left = tab:Section("Auto Farm", "Left")
+        local left = tab:Section("Movement", "Left")
         
         left:Combo("Move", "Movement Style", {"Instant Teleport", "SmoothLikeButter"}, 0, function(selectedIndex)
             print("Selected Move:", selectedIndex)
         end)
 
-        left:Toggle("Auto", "Start Auto", false, function(state)
-            AutoEnabled = state
-            print("Auto State:", state)
-            if state then
-                FindBrainrots()
-                GotoBrainrot()
-            end
+        left:Button("Goto Brainrot", function()
+            AutoEnabled = true
+            FindBrainrots()
+            GotoBrainrot()
         end)
 
         left:Text("Rarity Filter")
@@ -242,31 +245,31 @@ function GUI()
             SelectedRarities["Legendary"] = state
         end)
         
-        left:Toggle("FilterMythical", "Mythical", true, function(state)
-            SelectedRarities["Mythical"] = state
+        left:Toggle("FilterMythic", "Mythic", false, function(state)
+            SelectedRarities["Mythic"] = state
         end)
         
-        left:Toggle("FilterSecret", "Secret", true, function(state)
+        left:Toggle("FilterSecret", "Secret", false, function(state)
             SelectedRarities["Secret"] = state
         end)
 
-        left:Toggle("FilterGod", "God", true, function(state)
+        left:Toggle("FilterGod", "God", false, function(state)
             SelectedRarities["God"] = state
         end)
         
-        left:Toggle("FilterOG", "OG", true, function(state)
+        left:Toggle("FilterOG", "OG", false, function(state)
             SelectedRarities["OG"] = state
         end)
 
-        left:Toggle("FilterDivine", "Divine", true, function(state)
+        left:Toggle("FilterDivine", "Divine", false, function(state)
             SelectedRarities["Divine"] = state
         end)
 
-        left:Toggle("FilterAncient", "Ancient", true, function(state)
+        left:Toggle("FilterAncient", "Ancient", false, function(state)
             SelectedRarities["Ancient"] = state
         end)
 
-        left:Toggle("FilterClassified", "Classified", true, function(state)
+        left:Toggle("FilterClassified", "Classified", false, function(state)
             SelectedRarities["Classified"] = state
         end)
 
@@ -279,8 +282,33 @@ function GUI()
         right:Combo("Zone", "Select Zone", {"One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen"}, 0, function(selectedIndex)
             print("Selected Zone:", selectedIndex)
         end)
+
+        right:Button("Goto Zone", function()
+            --Nothing for now
+        end)
+
+        local Extra = tab:Section("MISC", "Right")
+
+        Extra:Toggle("AutoClicker", "Auto Clicker (To Upgrade)", false, function(state)
+            AutoClickerEnabled = state
+            
+            if state then
+                StartAutoClicker()
+            else
+                StopAutoClicker()
+            end
+        end)
+
+        Extra:Toggle("ToggelVip", "Look In Vip Area", false, function(state)
+            -- nothing for now
+        end)
+
+        Extra:Button("Auto Interact", function()
+            
+        end)
+
     end)
-    
+
     notify("SKIBIDI AUTO Menu Loaded!", "Success", 4)
 end
 
