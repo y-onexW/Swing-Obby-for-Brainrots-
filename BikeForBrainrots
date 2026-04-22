@@ -410,5 +410,3 @@ end
 FindBrainrots()
 ResetGuiState()
 GUI()
-GUI()
->>>>>>> 6ce5d648511fbd10c3835d05b2ed1617eb8df897:SwingObbyForBrainrots
