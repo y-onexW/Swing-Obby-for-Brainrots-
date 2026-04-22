@@ -5,10 +5,12 @@ function GUI()
 
         left:Button("Swing For Brainrots", "Swing For Brainrots", function()
             UI.RemoveTab("SKIBIDI MENU")
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/y-onexW/Swing-Obby-for-Brainrots-/refs/heads/main/SwingObbyForBrainrots"))()
         end)
 
         left:Button("Bike For Brainrots", "Bike", function()
             UI.RemoveTab("SKIBIDI MENU")
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/y-onexW/Swing-Obby-for-Brainrots-/refs/heads/main/BikeForBrainrots"))()
         end)
     end)
 
